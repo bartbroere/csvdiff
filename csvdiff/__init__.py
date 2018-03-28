@@ -39,6 +39,8 @@ def diff_files(from_file, to_file, index_columns, sep=',',
     """
     if low_memory_footprint:
         lmf_patch = {}
+        if not ignored_columns:
+            ignored_columns = []
         with open(from_file) as from_stream:
             headers = from_stream.readline().split(sep=sep)
         for header in headers:
