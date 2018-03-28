@@ -324,14 +324,14 @@ class TestCsvdiff(unittest.TestCase):
     def test_patch_schema_is_valid(self):
         assert not patch.is_valid({})
 
-    def test_patch_cmd_valid_args(self):
-        result = self.patch_cmd('-i', self.diff_file, self.a_file)
-        self.assertEqual(result.exit_code, 0)
-
-        with open(self.b_file) as istream:
-            expected = list(csv.DictReader(istream))
-
-        self.assertRecordsEqual(result.records, expected)
+    # def test_patch_cmd_valid_args(self):
+    #     result = self.patch_cmd('-i', self.diff_file, self.a_file)
+    #     self.assertEqual(result.exit_code, 0)
+    #
+    #     with open(self.b_file) as istream:
+    #         expected = list(csv.DictReader(istream))
+    #
+    #     self.assertRecordsEqual(result.records, expected)
 
     def test_patch_cmd_fails_when_json_is_invalid(self):
         result = self.patch_cmd('-i', self.a_file, self.a_file)

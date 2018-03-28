@@ -31,17 +31,30 @@ EXIT_DIFFERENT = 1
 EXIT_ERROR = 2
 
 
-def diff_files(from_file, to_file, index_columns, sep=',', ignored_columns=None):
+def diff_files(from_file, to_file, index_columns, sep=',',
+               ignored_columns=None, low_memory_footprint=False):
     """
     Diff two CSV files, returning the patch which transforms one into the
     other.
     """
-    with open(from_file) as from_stream:
-        with open(to_file) as to_stream:
-            from_records = records.load(from_stream, sep=sep)
-            to_records = records.load(to_stream, sep=sep)
-            return patch.create(from_records, to_records, index_columns,
-                                ignore_columns=ignored_columns)
+    if low_memory_footprint:
+        lmf_patch = {}
+        with open(from_file) as from_stream:
+            headers = from_stream.readline().split(sep=sep)
+        for header in headers:
+            if header not in ignored_columns and header not in index_columns:
+                ignore_this_run = {h for h in headers if h != header
+                                   and h not in index_columns}
+                lmf_patch = {**lmf_patch, **diff_files(
+                    from_file, to_file, index_columns, sep=sep,
+                    ignored_columns=ignore_this_run)}
+    else:
+        with open(from_file) as from_stream:
+            with open(to_file) as to_stream:
+                from_records = records.load(from_stream, sep=sep)
+                to_records = records.load(to_stream, sep=sep)
+                return patch.create(from_records, to_records, index_columns,
+                                    ignore_columns=ignored_columns)
 
 
 def diff_records(from_records, to_records, index_columns):
@@ -131,8 +144,11 @@ class CSVType(click.ParamType):
               help='a comma seperated list of columns to ignore from the comparison')
 @click.option('--significance', type=int,
               help='Ignore numeric changes less than this number of significant figures')
+@click.option('--low-memory-footprint', '-m', is_flag=True,
+              help="Low memory footprint, compare column by column and merge")
 def csvdiff_cmd(index_columns, from_csv, to_csv, style=None, output=None,
-                sep=',', quiet=False, ignore_columns=None, significance=None):
+                sep=',', quiet=False, ignore_columns=None, significance=None,
+                low_memory_footprint=False):
     """
     Compare two csv files to see what rows differ between them. The files
     are each expected to have a header row, and for each row to be uniquely
@@ -157,7 +173,7 @@ def csvdiff_cmd(index_columns, from_csv, to_csv, style=None, output=None,
             compact = (style == 'compact')
             _diff_files_to_stream(from_csv, to_csv, index_columns, ostream,
                                   compact=compact, sep=sep, ignored_columns=ignore_columns,
-                                  significance=significance)
+                                  significance=significance, low_memory_footprint=low_memory_footprint)
 
     except records.InvalidKeyError as e:
         error.abort(e.args[0])
@@ -168,8 +184,10 @@ def csvdiff_cmd(index_columns, from_csv, to_csv, style=None, output=None,
 
 def _diff_files_to_stream(from_csv, to_csv, index_columns, ostream,
                           compact=False, sep=',', ignored_columns=None,
-                          significance=None):
-    diff = diff_files(from_csv, to_csv, index_columns, sep=sep, ignored_columns=ignored_columns)
+                          significance=None, low_memory_footprint=False):
+    diff = diff_files(from_csv, to_csv, index_columns, sep=sep,
+                      ignored_columns=ignored_columns,
+                      low_memory_footprint=low_memory_footprint)
 
     if significance is not None:
         diff = patch.filter_significance(diff, significance)
